@@ -96,9 +96,6 @@ const AdminPage = ({ onNavigate }) => {
           <button onClick={handleLogin} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px' }}>
             {loading ? '⏳ Verifying...' : '🔓 Login to Admin Panel'}
           </button>
-          <p style={{ textAlign: 'center', fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginTop: 16 }}>
-            Demo password: ubtech@admin2025
-          </p>
         </div>
       </div>
     </div>
