@@ -1,0 +1,56 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Outfit',sans-serif;background:#fff;color:#050d1a;overflow-x:hidden}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+@keyframes slideLeft{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 rgba(232,184,75,0.4)}50%{box-shadow:0 0 0 8px rgba(232,184,75,0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.animate-fade-up{animation:fadeUp 0.6s ease both}
+.animate-scale-in{animation:scaleIn 0.5s ease both}
+.animate-slide-left{animation:slideLeft 0.7s ease both}
+.delay-100{animation-delay:.1s}.delay-200{animation-delay:.2s}
+.delay-300{animation-delay:.3s}.delay-400{animation-delay:.4s}
+
+.marquee-track{display:flex;gap:40px;animation:marquee 25s linear infinite;width:max-content}
+.marquee-track:hover{animation-play-state:paused}
+
+.cursor-glow{position:fixed;border-radius:50%;background:radial-gradient(circle,rgba(232,184,75,0.12) 0%,transparent 70%);pointer-events:none;transform:translate(-50%,-50%);z-index:9998;width:300px;height:300px}
+
+.page-hero{background:linear-gradient(135deg,#050d1a 0%,#0a1628 50%,#0f2044 100%);padding:100px 80px 80px;text-align:center;position:relative;overflow:hidden}
+.page-hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(2.2rem,5vw,4rem);font-weight:700;color:#fff;margin-bottom:20px;line-height:1.1}
+.page-hero p{color:rgba(255,255,255,.7);font-size:1.05rem;max-width:600px;margin:0 auto;line-height:1.8}
+.gold-line{width:60px;height:3px;background:linear-gradient(135deg,#e8b84b,#fcd34d);margin:20px auto;border-radius:2px}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(232,184,75,.15);border:1px solid rgba(232,184,75,.3);color:#e8b84b;padding:6px 16px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+
+.section-label{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#e8b84b;margin-bottom:10px}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.8rem,3vw,2.8rem);font-weight:700;color:#050d1a;line-height:1.2;margin-bottom:16px}
+
+.card{background:#fff;border:1px solid #e5e4e0;border-radius:16px;overflow:hidden;transition:box-shadow .3s,transform .3s,border-color .3s}
+.card:hover{box-shadow:0 12px 40px rgba(10,22,40,.1)}
+
+.btn-primary{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#e8b84b,#fcd34d);color:#050d1a;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;transition:transform .2s,box-shadow .2s;text-decoration:none}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(232,184,75,.4)}
+.btn-outline{display:inline-flex;align-items:center;gap:8px;background:transparent;color:rgba(255,255,255,.85);font-weight:600;padding:12px 28px;border-radius:10px;border:1.5px solid rgba(255,255,255,.3);cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;transition:all .2s}
+.btn-outline:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.6)}
+
+.form-input{width:100%;padding:11px 14px;border:1.5px solid #e5e4e0;border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;background:#fff;color:#050d1a;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:#e8b84b}
+
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+
+.whatsapp-float{position:fixed;bottom:28px;right:28px;z-index:1500;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+
+@media(max-width:768px){
+  .page-hero{padding:80px 24px 60px}
+}
