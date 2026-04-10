@@ -1,7 +1,6 @@
-// LeadershipSection.jsx — FIXED: photos persist via Cloudinary upload + localStorage fallback
-import { useState, useRef, useCallback, useEffect } from 'react';
+// LeadershipSection.jsx — Admin can upload/change leader photos
+import { useState, useRef, useCallback } from 'react';
 import { useAdmin } from '../../context/AdminContext';
-import { uploadImage } from '../../services/api';
 
 const defaultLeaders = [
   {
@@ -24,8 +23,6 @@ const defaultLeaders = [
   },
 ];
 
-const STORAGE_KEY = 'ubt_leader_photos';
-
 const branches = [
   { city:'Pune',        address:'Pune Office — Maharashtra',    phone:'+91 9370272741', icon:'🏛️', color:'#2563eb' },
   { city:'Ahilyanagar', address:'New Branch — Maharashtra',      phone:'+91 9370272741', icon:'🌟', color:'#059669', badge:'New' },
@@ -40,69 +37,35 @@ const milestones = [
   { year:'2025', event:'2500+ researchers, 400+ publications' },
 ];
 
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
 const LeadershipSection = ({ onNavigate }) => {
   const { isAdmin } = useAdmin();
-
-  // Load saved photos from localStorage on mount
-  const [leaders, setLeaders] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const savedPhotos = JSON.parse(saved); // { 1: 'https://...', 2: 'https://...' }
-        return defaultLeaders.map(l => ({
-          ...l,
-          img: savedPhotos[l.id] || l.img,
-        }));
-      }
-    } catch {}
-    return defaultLeaders;
-  });
-
-  const [editingId,  setEditingId]  = useState(null);
-  const [imgModal,   setImgModal]   = useState(null);
-  const [urlInput,   setUrlInput]   = useState('');
-  const [lightImg,   setLightImg]   = useState(null);
-  const [uploading,  setUploading]  = useState(false);
+  const [leaders, setLeaders] = useState(defaultLeaders);
+  const [editingId, setEditingId] = useState(null);
+  const [imgModal, setImgModal] = useState(null); // which leader to change image
+  const [urlInput, setUrlInput] = useState('');
+  const [lightImg, setLightImg] = useState(null);
   const fileRefs = useRef({});
 
-  // Persist photo URLs to localStorage whenever they change
-  const savePhotos = useCallback((updatedLeaders) => {
-    const photoMap = {};
-    updatedLeaders.forEach(l => { photoMap[l.id] = l.img; });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(photoMap));
-  }, []);
-
-  const updateLeaderImg = useCallback((leaderId, newUrl) => {
-    setLeaders(prev => {
-      const updated = prev.map(l => l.id === leaderId ? { ...l, img: newUrl } : l);
-      savePhotos(updated); // persist to localStorage
-      return updated;
-    });
-    setImgModal(null);
-    setUrlInput('');
-  }, [savePhotos]);
-
-  // Upload file to Cloudinary via backend, then persist URL
   const handleImageFile = useCallback(async (file, leaderId) => {
     if (!file || !file.type.startsWith('image/')) return;
-    setUploading(true);
-    try {
-      // Try Cloudinary upload first (permanent, survives logout)
-      const cloudinaryUrl = await uploadImage(file);
-      updateLeaderImg(leaderId, cloudinaryUrl);
-    } catch (e) {
-      console.warn('Cloudinary upload failed, using object URL:', e.message);
-      // Fallback: use object URL for current session
-      const objectUrl = URL.createObjectURL(file);
-      updateLeaderImg(leaderId, objectUrl);
-    } finally {
-      setUploading(false);
-    }
-  }, [updateLeaderImg]);
+    const b64 = await fileToBase64(file);
+    setLeaders(prev => prev.map(l => l.id === leaderId ? { ...l, img: b64 } : l));
+    setImgModal(null); setUrlInput('');
+  }, []);
 
   const applyUrl = (leaderId) => {
     if (!urlInput.trim()) return;
-    updateLeaderImg(leaderId, urlInput.trim());
+    setLeaders(prev => prev.map(l => l.id === leaderId ? { ...l, img: urlInput.trim() } : l));
+    setImgModal(null); setUrlInput('');
   };
 
   return (
@@ -117,7 +80,7 @@ const LeadershipSection = ({ onNavigate }) => {
       </div>
 
       {/* Leader cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:32, marginBottom:80 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:32, marginBottom:80 }}>
         {leaders.map((l) => (
           <div key={l.id} className="card animate-fade-up" style={{ padding:0, overflow:'hidden' }}>
             <div style={{ position:'relative', height:280, overflow:'hidden' }}>
@@ -129,6 +92,7 @@ const LeadershipSection = ({ onNavigate }) => {
               />
               <div style={{ position:'absolute', inset:0, background:`linear-gradient(to top,${l.color}dd 0%,transparent 55%)` }} />
 
+              {/* Admin: change photo button */}
               {isAdmin && (
                 <button onClick={() => { setImgModal(l.id); setUrlInput(''); }}
                   style={{ position:'absolute', top:12, right:12, background:'rgba(232,184,75,0.95)', border:'none', color:'#050d1a', padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Outfit, sans-serif' }}>
@@ -136,6 +100,7 @@ const LeadershipSection = ({ onNavigate }) => {
                 </button>
               )}
 
+              {/* Click to view full image hint */}
               <div style={{ position:'absolute', bottom:52, right:12, background:'rgba(0,0,0,0.55)', color:'#fff', fontSize:10, padding:'3px 8px', borderRadius:6 }}>
                 🔍 Click to enlarge
               </div>
@@ -148,15 +113,13 @@ const LeadershipSection = ({ onNavigate }) => {
 
             <div style={{ padding:'24px 28px' }}>
               <p style={{ color:'#6b7280', fontSize:14, lineHeight:1.8, marginBottom:20 }}>{l.bio}</p>
-              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                <a href={`mailto:${l.social.email}`}
-                  style={{ display:'inline-flex', alignItems:'center', gap:6, background:`${l.color}12`, color:l.color, padding:'7px 16px', borderRadius:999, fontSize:12.5, fontWeight:600, textDecoration:'none', border:`1px solid ${l.color}25`, transition:'all 0.2s' }}
+              <div style={{ display:'flex', gap:10 }}>
+                <a href={`mailto:${l.social.email}`} style={{ display:'inline-flex', alignItems:'center', gap:6, background:`${l.color}12`, color:l.color, padding:'7px 16px', borderRadius:999, fontSize:12.5, fontWeight:600, textDecoration:'none', border:`1px solid ${l.color}25`, transition:'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.background=l.color; e.currentTarget.style.color='#fff'; }}
                   onMouseLeave={e => { e.currentTarget.style.background=`${l.color}12`; e.currentTarget.style.color=l.color; }}>
                   📧 Email
                 </a>
-                <a href={l.social.linkedin} target="_blank" rel="noreferrer"
-                  style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(10,22,40,0.06)', color:'#0a1628', padding:'7px 16px', borderRadius:999, fontSize:12.5, fontWeight:600, textDecoration:'none', transition:'all 0.2s' }}
+                <a href={l.social.linkedin} target="_blank" rel="noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(10,22,40,0.06)', color:'#0a1628', padding:'7px 16px', borderRadius:999, fontSize:12.5, fontWeight:600, textDecoration:'none', transition:'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.background='#0a1628'; e.currentTarget.style.color='#fff'; }}
                   onMouseLeave={e => { e.currentTarget.style.background='rgba(10,22,40,0.06)'; e.currentTarget.style.color='#0a1628'; }}>
                   🔗 LinkedIn
@@ -211,7 +174,7 @@ const LeadershipSection = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Fullscreen lightbox */}
+      {/* Fullscreen image lightbox */}
       {lightImg && (
         <div style={{ position:'fixed', inset:0, zIndex:4000, background:'rgba(0,0,0,0.97)', display:'flex', alignItems:'center', justifyContent:'center' }}
           onClick={() => setLightImg(null)}>
@@ -229,35 +192,33 @@ const LeadershipSection = ({ onNavigate }) => {
               Change Photo — {leaders.find(l => l.id === imgModal)?.name}
             </h3>
 
+            {/* Browse from computer */}
             <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:11, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:8 }}>Upload from computer</label>
-              <button onClick={() => fileRefs.current[imgModal]?.click()} disabled={uploading}
-                style={{ width:'100%', padding:'12px', borderRadius:10, background: uploading ? '#e5e4e0' : '#050d1a', color: uploading ? '#9ca3af' : '#e8b84b', border:'none', cursor: uploading ? 'not-allowed' : 'pointer', fontWeight:600, fontSize:14, fontFamily:'Outfit, sans-serif' }}>
-                {uploading ? '⏳ Uploading to Cloudinary...' : '📁 Browse Photo'}
+              <button onClick={() => fileRefs.current[imgModal]?.click()}
+                style={{ width:'100%', padding:'12px', borderRadius:10, background:'#050d1a', color:'#e8b84b', border:'none', cursor:'pointer', fontWeight:600, fontSize:14, fontFamily:'Outfit, sans-serif' }}>
+                📁 Browse Photo
               </button>
               <input
                 ref={el => fileRefs.current[imgModal] = el}
                 type="file" accept="image/*" style={{ display:'none' }}
                 onChange={e => handleImageFile(e.target.files[0], imgModal)}
               />
-              {/* Persists permanently notice */}
-              <div style={{ marginTop:8, fontSize:11.5, color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:8, padding:'7px 12px' }}>
-                ✅ Photo uploads to Cloudinary — persists permanently after logout
-              </div>
             </div>
 
+            {/* Divider */}
             <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0' }}>
               <div style={{ flex:1, height:1, background:'#e5e4e0' }} />
               <span style={{ fontSize:12, color:'#9ca3af' }}>OR paste image URL</span>
               <div style={{ flex:1, height:1, background:'#e5e4e0' }} />
             </div>
 
+            {/* URL input */}
             <input
               className="form-input"
               placeholder="https://example.com/photo.jpg"
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && applyUrl(imgModal)}
               style={{ marginBottom:12 }}
             />
             <div style={{ display:'flex', gap:10 }}>
