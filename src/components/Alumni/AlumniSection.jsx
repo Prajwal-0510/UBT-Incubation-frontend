@@ -22,7 +22,6 @@ const CAT_COLORS = {
 
 const AlumniSection = () => {
   const admin = useAdmin();
-  if (!admin) return null;
 
   const { isAdmin, alumni, addAlumni, updateAlumni, removeAlumni } = admin;
   const [filter,    setFilter]    = useState('all');

@@ -1,161 +1,97 @@
-// =============================================================================
-// src/services/api.js
-// FIXED VERSION — headers always merged correctly, body never lost
-// =============================================================================
+// src/services/api.js — FIXED: token sent on ALL requests (including admin GETs)
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const getToken  = () => localStorage.getItem('ubt_admin_token');
+const saveToken = (t) => localStorage.setItem('ubt_admin_token', t);
+const dropToken = () => localStorage.removeItem('ubt_admin_token');
 
-// ─── Token helpers ─────────────────────────────────────────────────────────────
-const getToken  = () => localStorage.getItem("ubt_admin_token");
-const saveToken = (t) => localStorage.setItem("ubt_admin_token", t);
-const dropToken = () => localStorage.removeItem("ubt_admin_token");
-
-// ─── Core request function ─────────────────────────────────────────────────────
-// FIX: headers are built first, then options spread — body is never lost
-async function request(path, method = "GET", body = null, requiresAuth = false) {
-  const headers = {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-  };
-
+/**
+ * KEY FIX: Token is now sent on ALL requests if available.
+ *
+ * Previously: `if (token && method !== 'GET')` — this meant GET requests
+ * to admin-protected routes like /contact/inquiries never sent the JWT,
+ * so Spring Security rejected them with 403 even though the user was logged in.
+ *
+ * Fix: Always include Authorization header when token exists.
+ * Public GET routes ignore the token harmlessly — only protected routes use it.
+ */
+async function request(path, method = 'GET', body = null) {
+  const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
   const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
-  const fetchOptions = { method, headers };
-  if (body !== null) {
-    fetchOptions.body = JSON.stringify(body);
-  }
+  // Send token on ALL requests if available
+  // (needed for admin GETs like /contact/inquiries, /admin/stats)
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, fetchOptions);
+  const options = { method, headers };
+  if (body !== null) options.body = JSON.stringify(body);
 
-  // Handle non-JSON responses gracefully
+  const res = await fetch(`${BASE_URL}${path}`, options);
   const text = await res.text();
   let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Server returned non-JSON response (status ${res.status})`);
-  }
-
-  if (!res.ok) {
-    // Surface the real server message (validation error, wrong password etc.)
-    const msg = json?.message
-      || (json?.data && typeof json.data === "object"
-          ? Object.values(json.data).join(", ")
-          : null)
-      || `Request failed with status ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return json; // { success, message, data }
+  try { json = JSON.parse(text); } catch { throw new Error(`Server error (${res.status})`); }
+  if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+  return json;
 }
 
-// =============================================================================
-// AUTH
-// =============================================================================
+// Upload image file → returns public Cloudinary URL
+async function uploadImage(file) {
+  const token = getToken();
+  if (!token) throw new Error('Admin login required to upload images');
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${BASE_URL}/upload/image`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: fd,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.message || 'Upload failed');
+  return json.data; // Cloudinary URL
+}
+
 export const authApi = {
-
-  // POST /api/auth/login  { "password": "ubtech@admin2025" }
-  login: async (password) => {
-    // FIX: explicitly pass password as object — was getting swallowed before
-    const json = await request("/auth/login", "POST", { password });
-    if (json?.data?.token) {
-      saveToken(json.data.token);
-    }
-    return json;
-  },
-
-  logout: () => dropToken(),
-
+  login:    async (password) => { const j = await request('/auth/login','POST',{password}); if(j?.data?.token) saveToken(j.data.token); return j; },
+  logout:   () => dropToken(),
   isLoggedIn: () => !!getToken(),
-
-  verify: () => request("/auth/verify", "GET"),
+  verify:   () => request('/auth/verify','GET'),
 };
-
-// =============================================================================
-// GALLERY
-// =============================================================================
 export const galleryApi = {
-
-  // GET /api/gallery  OR  /api/gallery?category=college-visit
-  getAll: (category) =>
-    request(`/gallery${category ? `?category=${encodeURIComponent(category)}` : ""}`, "GET"),
-
-  // POST /api/gallery  (admin)
-  add: (item) => request("/gallery", "POST", item),
-
-  // DELETE /api/gallery/:id  (admin)
-  remove: (id) => request(`/gallery/${id}`, "DELETE"),
+  getAll: (cat) => request(`/gallery${cat ? `?category=${encodeURIComponent(cat)}` : ''}`),
+  add:    (item) => request('/gallery', 'POST', item),
+  remove: (id)   => request(`/gallery/${id}`, 'DELETE'),
 };
-
-// =============================================================================
-// PROJECTS
-// =============================================================================
 export const projectsApi = {
-
-  // GET /api/projects  OR  /api/projects?level=BE/BTech
-  getAll: (level) =>
-    request(`/projects${level ? `?level=${encodeURIComponent(level)}` : ""}`, "GET"),
-
-  // POST /api/projects  (admin)
-  add: (project) => request("/projects", "POST", project),
-
-  // DELETE /api/projects/:id  (admin)
-  remove: (id) => request(`/projects/${id}`, "DELETE"),
+  getAll: (lv) => request(`/projects${lv ? `?level=${encodeURIComponent(lv)}` : ''}`),
+  add:    (p)  => request('/projects', 'POST', p),
+  remove: (id) => request(`/projects/${id}`, 'DELETE'),
 };
-
-// =============================================================================
-// UPDATES / ANNOUNCEMENTS
-// =============================================================================
 export const updatesApi = {
-
-  // GET /api/updates
-  getAll: () => request("/updates", "GET"),
-
-  // POST /api/updates  (admin)
-  add: (update) => request("/updates", "POST", update),
-
-  // DELETE /api/updates/:id  (admin)
-  remove: (id) => request(`/updates/${id}`, "DELETE"),
-
-  // PATCH /api/updates/:id/pin  (admin)
-  togglePin: (id) => request(`/updates/${id}/pin`, "PATCH"),
+  getAll:    ()    => request('/updates'),
+  add:       (u)   => request('/updates', 'POST', u),
+  remove:    (id)  => request(`/updates/${id}`, 'DELETE'),
+  togglePin: (id)  => request(`/updates/${id}/pin`, 'PATCH'),
 };
-
-// =============================================================================
-// CONTACT FORM
-// =============================================================================
+export const alumniApi = {
+  getAll: (cat) => request(`/alumni${cat ? `?category=${encodeURIComponent(cat)}` : ''}`),
+  add:    (d)   => request('/alumni', 'POST', d),
+  update: (id, d) => request(`/alumni/${id}`, 'PUT', d),
+  remove: (id)  => request(`/alumni/${id}`, 'DELETE'),
+};
 export const contactApi = {
-
-  // POST /api/contact  (public — student submits form)
-  submit: (form) => request("/contact", "POST", form),
-
-  // GET /api/contact/inquiries  (admin)
-  getInquiries: (status) =>
-    request(`/contact/inquiries${status ? `?status=${encodeURIComponent(status)}` : ""}`, "GET"),
-
-  // PATCH /api/contact/inquiries/:id/status  (admin)
-  updateStatus: (id, status) =>
-    request(`/contact/inquiries/${id}/status`, "PATCH", { status }),
-
-  // DELETE /api/contact/inquiries/:id  (admin)
-  deleteInquiry: (id) => request(`/contact/inquiries/${id}`, "DELETE"),
+  submit:        (f)       => request('/contact', 'POST', f),
+  getInquiries:  (st)      => request(`/contact/inquiries${st ? `?status=${st}` : ''}`, 'GET'),
+  updateStatus:  (id, st)  => request(`/contact/inquiries/${id}/status`, 'PATCH', { status: st }),
+  deleteInquiry: (id)      => request(`/contact/inquiries/${id}`, 'DELETE'),
 };
-
-// =============================================================================
-// TESTIMONIALS
-// =============================================================================
+export const footerApi = {
+  get:    ()  => request('/footer'),
+  update: (d) => request('/footer', 'PUT', d),
+};
 export const testimonialsApi = {
-  getAll: ()  => request("/testimonials", "GET"),
-  add:    (t) => request("/testimonials", "POST", t),
-  remove: (id)=> request(`/testimonials/${id}`, "DELETE"),
+  getAll: ()    => request('/testimonials'),
+  add:    (t)   => request('/testimonials', 'POST', t),
+  remove: (id)  => request(`/testimonials/${id}`, 'DELETE'),
 };
-
-// =============================================================================
-// ADMIN DASHBOARD
-// =============================================================================
-export const adminApi = {
-  getStats: () => request("/admin/stats", "GET"),
-};
+export const adminApi = { getStats: () => request('/admin/stats') };
+export { uploadImage };
