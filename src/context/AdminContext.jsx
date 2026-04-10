@@ -45,13 +45,20 @@ export const AdminProvider = ({ children }) => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [gRes, pRes, uRes, aRes] = await Promise.all([
-        galleryApi.getAll(), projectsApi.getAll(), updatesApi.getAll(), alumniApi.getAll(),
+      const results = await Promise.allSettled([
+        galleryApi.getAll(),
+        projectsApi.getAll(),
+        updatesApi.getAll(),
+        alumniApi.getAll(),
       ]);
-      if (gRes?.data)  setGallery(gRes.data);
-      if (pRes?.data)  setProjects(pRes.data);
-      if (uRes?.data)  setUpdates(uRes.data);
-      if (aRes?.data)  setAlumni(aRes.data);
+
+      const [gRes, pRes, uRes, aRes] = results;
+
+      if (gRes.status === 'fulfilled') setGallery(gRes.value.data);
+      if (pRes.status === 'fulfilled') setProjects(pRes.value.data);
+      if (uRes.status === 'fulfilled') setUpdates(uRes.value.data);
+      if (aRes.status === 'fulfilled') setAlumni(aRes.value.data);
+
       setBackendOnline(true);
       console.log('✅ Backend connected — data loaded from database.');
     } catch (err) {
