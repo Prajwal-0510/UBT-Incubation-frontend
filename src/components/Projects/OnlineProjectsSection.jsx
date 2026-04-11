@@ -18,12 +18,14 @@ const uploadToCloud = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+  const BASE_URL = import.meta.env.VITE_API_URL;
+  const token = localStorage.getItem('ubt_admin_token');
 
-const res = await fetch(`${BASE_URL}/upload`, {
-  method: "POST",
-  body: formData,
-});
+  const res = await fetch(`${BASE_URL}/upload`, {
+    method: "POST",
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    body: formData,
+  });
 
   const data = await res.json();
 
